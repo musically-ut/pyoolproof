@@ -46,9 +46,6 @@ doing them is making them a part of the
 [REPL](http://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop),
 making it a _Read-Eval-HeartBeat-Print-Loop_.
 
-, as I have done
-here.
-
 Lastly, detecting aberrant behaviour is too domain specific a problem to be
 addressed by a wrapper. For all the wrapper knows, you probably wanted to write
 a violent program. Hence, the wrapper has a big red panic button on top which
