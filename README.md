@@ -4,7 +4,7 @@ A tiny wrapper to execute applications in, which will wait for heartbeats from
 the applications, restart them if they miss too many heartbeats and if they
 crash (exit with a non-zero return value).
 
-![Generic wrapper](Wrapper.png "Ideal wrapper.")
+For more details and the context, see my [blog post about reliability](http://musicallyut.blogspot.com/2011/10/software-reliability-3-general-problems.html).
 
 ##Reliability
 
@@ -41,10 +41,8 @@ subprocess and if it exits with a non-zero error code, restart it.
 
 Dealing with infinite loops is trickier. Heartbeats are a promising solution,
 but 
-[getting them right is difficult](http://zguide.zeromq.org/page:all#Heartbeating). One simple way of
-doing them is making them a part of the
-[REPL](http://en.wikipedia.org/wiki/Read%E2%80%93eval%E2%80%93print_loop),
-making it a _Read-Eval-HeartBeat-Print-Loop_.
+[getting them right is difficult](http://zguide.zeromq.org/page:all#Heartbeating). 
+Here, they are made a part of the main loop and detected.
 
 Lastly, detecting aberrant behaviour is too domain specific a problem to be
 addressed by a wrapper. For all the wrapper knows, you probably wanted to write
@@ -71,4 +69,52 @@ would also fix the problem.
 + *cmd_kill.py* is an example of how to press the red panic button.
 + *random_app.py* is a program which has arrhythmia and randomly quits working, or just crashes. This is a pretty good model of a sample program.
 + *run_monitor.py* runs the program
+
+##Sample output:
+
+    $ ./run_monitor.py ./random_app.py
+
+    [monitor] Running ./random_app.py ... 
+    [naughty_worker] Working (sleeping) for 1.71281739563 seconds.
+    [naughty_worker] Working (sleeping) for 2.75858076957 seconds.
+    [monitor] Got heartbeat.
+    [monitor] Missing a timeout ...
+    [monitor] Missing a timeout ...
+    [monitor] Killing off the process ...
+    Error = Missed 2 heartbeats
+
+    [monitor] Running ./random_app.py ... 
+    [naughty_worker] Working (sleeping) for 1.57606264143 seconds.
+    [naughty_worker] Working (sleeping) for 1.62001906386 seconds.
+    [monitor] Got heartbeat.
+    [monitor] Missing a timeout ...
+    [naughty_worker] Randomly crashing ...
+    [monitor] Got heartbeat.
+    [monitor] Missing a timeout ...
+    Error = 255
+
+    [monitor] Running ./random_app.py ... 
+    [naughty_worker] Working (sleeping) for 0.641565584847 seconds.
+    [naughty_worker] Working (sleeping) for 0.175138440312 seconds.
+    [monitor] Got heartbeat.
+    [naughty_worker] Working (sleeping) for 1.86305043069 seconds.
+    [monitor] Got heartbeat.
+    [monitor] Missing a timeout ...
+    [naughty_worker] Working (sleeping) for 1.96380424542 seconds.
+    [monitor] Got heartbeat.
+    [monitor] Missing a timeout ...
+    [naughty_worker] Working (sleeping) for 2.84784868718 seconds.
+    [monitor] Got heartbeat.
+    [monitor] Missing a timeout ...
+    [monitor] Missing a timeout ...
+    [monitor] Killing off the process ...
+    Error = Missed 2 heartbeats
+
+    [monitor] Running ./random_app.py ... 
+    [naughty_worker] Working (sleeping) for 1.75870489327 seconds.
+    [naughty_worker] Enough work ...
+    [monitor] Got heartbeat.
+    [monitor] Missing a timeout ...
+    [monitor] Exiting with return code 0
+
 

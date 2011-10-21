@@ -88,7 +88,6 @@ def main(exec_name, args):
                         print '[monitor] Order to execute'
                         all_is_well = False
                         retcode = 'Killed by order'
-                        continue
 
                 if end_time <= time.time():
                     end_time = time.time() + g_TO
@@ -97,8 +96,6 @@ def main(exec_name, args):
 
                 if missed_TO >= g_N:
                     print '[monitor] Killing off the process ...'
-                    if not _kill(p):
-                        print '[monitor] Probably already dead.'
                     retcode = 'Missed ' + str(missed_TO) + ' heartbeats'
                     all_is_well = False
 
