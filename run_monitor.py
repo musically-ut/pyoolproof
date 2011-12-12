@@ -4,14 +4,9 @@ import subprocess
 import sys
 import time
 import signal
-import os
 import zmq
-
-
-g_heartbeat_addr = 'ipc://heartbeat'
-g_command_port = 'ipc://command'
-g_N = 2         # How many heart beats are alright?
-g_TO = 1        # Time between heartbeats
+import traceback
+import argparse
 
 def _kill(p):
     """Kills the process and returns True if it succeeded,
@@ -23,7 +18,7 @@ def _kill(p):
     except OSError:
         return False
 
-def main(exec_name, args):
+def main(exec_cmd, g_TO, g_N, g_heartbeat_addr, g_command_port):
     """This runs the given application in a wrapper which restarts
     it on any of the following signs:
     <ul>
@@ -32,13 +27,14 @@ def main(exec_name, args):
         <li> An external command requests so. </li>
     </ul>
 
-    @param exec_name The name of the executable.
-    @param args The arguments to pass to the file.
+    @param exec_cmd The command line of the executable.
+    @param g_TO The period for the heartbeats (in sec)
+    @param g_N The number of heartbeats which can be missed
+    @param g_heartbeat_addr Port to bind to for listening to heartbeats
+    @param g_command_port Port to bind to to receive the kill command
 
     @returns The error code returned by the application, or None.
     """
-
-    global g_TO, g_N, g_command_port, g_heartbeat_addr
 
     ctx = zmq.Context()
 
@@ -51,17 +47,20 @@ def main(exec_name, args):
     in_cmd.bind(g_command_port)
 
     retcode = 1
+    
+    # Assuming the command string is program name followed by arguments.
+    exec_prog_args = [elem for elem in exec_cmd.split() if len(elem) > 0]
 
     while retcode:  # While the process does not exit cleanly
         print
-        print '[monitor] Running ' + exec_name + ' ... '
+        print '[monitor] Running ' + exec_cmd + ' ... '
 
         # Disable catching Ctrl-C by the subprocess module 
         # Passing it to the application instead.
-        # signal.signal(signal.SIGINT, signal.SIG_IGN)
+        signal.signal(signal.SIGINT, signal.SIG_IGN)
 
         try:
-            p = subprocess.Popen([exec_name] + args)
+            p = subprocess.Popen(exec_prog_args)
         except OSError as e:
             print '*** Popen exception: ' + str(e)
             return None
@@ -77,8 +76,6 @@ def main(exec_name, args):
 
                 for sock in r:
                     msg = sock.recv() 
-                    # Drain out all messages (if the wrapper is too slow)
-                    while(msg): msg = sock.recv(zmq.NOBLOCK)
 
                     if sock == in_hb:
                         print '[monitor] Got heartbeat.'
@@ -101,6 +98,7 @@ def main(exec_name, args):
 
             except zmq.ZMQError as e:
                 print '[monitor] *** ZMQ had a problem: ' + str(e)
+                traceback.print_exc()
 
             if not all_is_well:
                 if not _kill(p):
@@ -113,7 +111,7 @@ def main(exec_name, args):
                 break
 
         # Re-enable Ctrl-C handler to exit this wrapper
-        # signal.signal(signal.SIGINT, signal.default_int_handler)
+        signal.signal(signal.SIGINT, signal.default_int_handler)
 
         if retcode:
             print >> sys.stderr, 'Error = ' + str(retcode) + '\n'
@@ -124,9 +122,42 @@ def main(exec_name, args):
 
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        print 'Usage: ' + sys.argv[0] + ' <exec name> [arguments]'
-    else:
-        main(sys.argv[1], sys.argv[2:])
+    parser = argparse.ArgumentParser(
+            description='Wrapper for reliably executing programs within.')
+    parser.add_argument(
+            'exec_program',
+            help='the program to run in this wrapper')
+    parser.add_argument(
+            '--heartbeat-addr',
+            '-b',
+            default='ipc://heartbeat',
+            help='address for receiving heartbeats')
+    parser.add_argument(
+            '--command-addr',
+            '-c',
+            default='ipc://command',
+            help='address for receiving kill/restart command')
+    parser.add_argument(
+            '--heartbeat-timeout',
+            '-t',
+            type=float,
+            default=1,
+            help='period (in sec) of the heartbeats given by the program')
+    parser.add_argument(
+            '--misses-allowed',
+            '-m',
+            type=int,
+            default=2,
+            help='how many heartbeats missed before the program is killed')
+
+    parsed_args = parser.parse_args()
+
+    main(
+            exec_cmd = parsed_args.exec_program,
+            g_TO = parsed_args.heartbeat_timeout,
+            g_N = parsed_args.misses_allowed,
+            g_command_port = parsed_args.command_addr,
+            g_heartbeat_addr = parsed_args.heartbeat_addr
+            )
 
 
